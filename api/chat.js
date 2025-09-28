@@ -1,14 +1,8 @@
-// Serverless function for Vercel: place this file at /api/chat.js in a repo
-// Env vars to set in Vercel: HF_TOKEN (required), optional HF_EMBEDDINGS_MODEL, HF_TEXT_MODEL
-// Default models keep it light and free-ish. You can change them in Vercel → Settings → Environment Variables.
-
 const HF_TOKEN = process.env.HF_TOKEN;
 const EMB_MODEL = process.env.HF_EMBEDDINGS_MODEL || 'sentence-transformers/all-MiniLM-L6-v2'; // 384 dims
 const GEN_MODEL = process.env.HF_TEXT_MODEL || 'google/flan-t5-base'; // text2text-generation
 
-// ───────────────────────────────────────────────────────────────────────────────
-// 1) Minimal corpus (replace with YOUR content). Keep it short & factual.
-// You can also load from files; but embedding at cold start is fine for a tiny corpus.
+// --- mini corpus : remplace par tes textes courts et factuels ---
 const DOCS = [
   { id: 'about', text: `Ingénieur consultant spécialisé en CCaaS (Contact Center as a Service), intégrations Salesforce (Service Cloud) et téléphonie cloud. Focalisé sur des architectures simples, SSO (Single Sign-On)/MFA (Multi-Factor Authentication), et performance.` },
   { id: 'experience-1', text: `Consultant CX chez Devoteam (2022–2025). Projets Suez/SAUR: Amazon Connect, Genesys Cloud, CTI Salesforce, BYOC (Bring Your Own Carrier), monitoring, réduction MTTR (Mean Time To Repair).` },
@@ -16,11 +10,9 @@ const DOCS = [
   { id: 'skills', text: `Compétences: Amazon Connect, Genesys Cloud, Salesforce Service Cloud, Open CTI, SBC (Session Border Controller), SIP (Session Initiation Protocol), KPI (Key Performance Indicator).` }
 ];
 
-// Cache embeddings between invocations (warm lambda)
 let DOC_EMBEDS = null;
 
 module.exports = async (req, res) => {
-  // CORS: allow your static site to call this function
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -31,17 +23,17 @@ module.exports = async (req, res) => {
     if (!HF_TOKEN) return res.status(500).json({ error: 'Missing HF_TOKEN env var' });
 
     const { q } = req.body || {};
-    if (!q || typeof q !== 'string') return res.status(400).json({ error: 'Missing \"q\" in JSON body' });
+    if (!q || typeof q !== 'string') return res.status(400).json({ error: 'Missing "q" in JSON body' });
 
-    // 1) Embed query
+    // 1) Embedding de la question
     const qVec = await embedText(q);
 
-    // 2) Embed docs (once per warm container)
+    // 2) Embeddings des docs (mise en cache à chaud)
     if (!DOC_EMBEDS) {
       DOC_EMBEDS = await Promise.all(DOCS.map(d => embedText(d.text)));
     }
 
-    // 3) Rank docs by cosine similarity
+    // 3) Classement par similarité cosinus
     const ranked = DOCS.map((d, i) => ({
       id: d.id,
       text: d.text,
@@ -50,15 +42,21 @@ module.exports = async (req, res) => {
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
 
-    const context = ranked.map(r => `(${r.id}) ${r.text}`).join('\\n\\n');
+    const context = ranked.map(r => `(${r.id}) ${r.text}`).join('\n\n');
 
-    // 4) Generate answer using a small instruction model (text2text)
-    const prompt = `Tu es un assistant RAG pour le portfolio de Yaniss.\\n` +
-      `Réponds UNIQUEMENT avec les informations ci-dessous.\\n` +
-      `Si l'information n'y est pas, dis-le simplement.\\n\\n` +
-      `CONTEXT:\\n${context}\\n\\n` +
-      `QUESTION:\\n${q}\\n\\n` +
-      `RÉPONSE (en français, concise, claire):`;
+    // 4) Génération
+    const prompt =
+`Tu es un assistant RAG pour le portfolio de Yaniss.
+Réponds UNIQUEMENT avec les informations ci-dessous.
+Si l'information n'y est pas, dis-le simplement.
+
+CONTEXT:
+${context}
+
+QUESTION:
+${q}
+
+RÉPONSE (en français, concise, claire):`;
 
     const answer = await textGenerate(prompt);
 
@@ -69,10 +67,9 @@ module.exports = async (req, res) => {
   }
 };
 
-// ───────────────────────────────────────────────────────────────────────────────
-// Helpers
+// ---------- helpers ----------
 async function embedText(text) {
-  const resp = await fetch(`https://api-inference.huggingface.co/pipeline/feature-extraction/${EMB_MODEL}`, {
+  const resp = await fetch(`https://api-inference.huggingface.co/models/${EMB_MODEL}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${HF_TOKEN}`,
@@ -86,8 +83,7 @@ async function embedText(text) {
     throw new Error(`Embeddings API error: ${resp.status} ${msg}`);
   }
   const data = await resp.json();
-  // HF returns nested arrays; flatten first axis if present
-  const arr = Array.isArray(data[0]) ? data[0] : data;
+  const arr = Array.isArray(data[0]) ? data[0] : data; // flatten si nécessaire
   return Float32Array.from(arr);
 }
 
@@ -109,7 +105,6 @@ async function textGenerate(prompt) {
     throw new Error(`Text gen API error: ${resp.status} ${msg}`);
   }
   const out = await resp.json();
-  // For text2text models (e.g., flan-t5), response is [{ generated_text: \"...\" }]
   let text = Array.isArray(out) ? out[0]?.generated_text : out?.generated_text;
   if (!text) text = typeof out === 'string' ? out : JSON.stringify(out);
   return text.trim();
@@ -122,7 +117,4 @@ function cosine(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-9);
 }
 
-async function safeText(resp) {
-  try { return await resp.text(); } catch { return ''; }
-}
-
+async function safeText(resp) { try { return await resp.text(); } catch { return ''; } }

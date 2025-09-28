@@ -1,8 +1,8 @@
 const HF_TOKEN = process.env.HF_TOKEN;
-const EMB_MODEL = process.env.HF_EMBEDDINGS_MODEL || 'sentence-transformers/all-MiniLM-L6-v2'; // 384 dims
-const GEN_MODEL = process.env.HF_TEXT_MODEL || 'google/flan-t5-base'; // text2text-generation
+const EMB_MODEL = process.env.HF_EMBEDDINGS_MODEL || "thenlper/gte-small";     // embeddings robustes
+const GEN_MODEL = process.env.HF_TEXT_MODEL || "google/flan-t5-base";          // petit modèle text2text
 
-// --- mini corpus : remplace par tes textes courts et factuels ---
+// --- Mini corpus : remplace par tes textes courts et factuels ---
 const DOCS = [
   { id: 'about', text: `Ingénieur consultant spécialisé en CCaaS (Contact Center as a Service), intégrations Salesforce (Service Cloud) et téléphonie cloud. Focalisé sur des architectures simples, SSO (Single Sign-On)/MFA (Multi-Factor Authentication), et performance.` },
   { id: 'experience-1', text: `Consultant CX chez Devoteam (2022–2025). Projets Suez/SAUR: Amazon Connect, Genesys Cloud, CTI Salesforce, BYOC (Bring Your Own Carrier), monitoring, réduction MTTR (Mean Time To Repair).` },

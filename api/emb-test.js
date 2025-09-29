@@ -4,26 +4,25 @@ module.exports = async (req, res) => {
   const token = process.env.HF_TOKEN;
   if (!token) return res.status(500).json({ ok: false, error: "HF_TOKEN missing" });
 
-  const model = "sentence-transformers/all-MiniLM-L6-v2";
+  // Use a model that returns embeddings via /models
+  const model = "thenlper/gte-small";
 
   try {
-    const resp = await fetch(
-      `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "x-wait-for-model": "true"
-        },
-        body: JSON.stringify({ inputs: ["test embedding yaniss"] })
-      }
-    );
+    const r = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "x-wait-for-model": "true"
+      },
+      // Plain string input works with gte-small
+      body: JSON.stringify({ inputs: "test embedding yaniss" })
+    });
 
-    const text = await resp.text();
+    const txt = await r.text();
     return res
-      .status(resp.ok ? 200 : 500)
-      .json({ ok: resp.ok, hint: resp.ok ? "embeddings ok" : text.slice(0, 200) });
+      .status(r.ok ? 200 : 500)
+      .json({ ok: r.ok, hint: r.ok ? "embeddings ok" : txt.slice(0, 300) });
   } catch (e) {
     return res.status(500).json({ ok: false, hint: String(e) });
   }

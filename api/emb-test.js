@@ -4,11 +4,9 @@ module.exports = async (req, res) => {
   const token = process.env.HF_TOKEN;
   if (!token) return res.status(500).json({ ok: false, error: "HF_TOKEN missing" });
 
-  // Modèle d'embeddings fiable
-  const model = process.env.HF_EMBEDDINGS_MODEL || "thenlper/gte-small";
+  const model = "sentence-transformers/all-MiniLM-L6-v2";
 
   try {
-    // FORCER la pipeline d'embeddings
     const resp = await fetch(
       `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`,
       {
@@ -18,7 +16,6 @@ module.exports = async (req, res) => {
           "Content-Type": "application/json",
           "x-wait-for-model": "true"
         },
-        // Liste de chaînes = format bien supporté par sentence-transformers
         body: JSON.stringify({ inputs: ["test embedding yaniss"] })
       }
     );
